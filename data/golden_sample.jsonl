@@ -1,0 +1,8 @@
+{"question": "How does dense passage retrieval compare to BM25?", "expected_doc_ids": ["2004.04906"], "expected_keywords": ["dense", "BM25", "encoder"], "type": "factual"}
+{"question": "What is the lost in the middle phenomenon in long context models?", "expected_doc_ids": ["2307.03172"], "expected_keywords": ["lost in the middle", "context", "position"], "type": "factual"}
+{"question": "What metrics does RAGAS use to evaluate retrieval augmented generation?", "expected_doc_ids": ["2309.15217"], "expected_keywords": ["faithfulness", "answer relevancy", "context precision"], "type": "factual"}
+{"question": "How do REALM and RAG differ in their use of retrieval?", "expected_doc_ids": ["2005.11401", "2002.08904"], "expected_keywords": ["REALM", "retriever", "pre-training"], "type": "comparison"}
+{"question": "What is the deepest point in the Atlantic Ocean?", "expected_doc_ids": [], "expected_keywords": [], "type": "unanswerable"}
+{"question": "What about evaluation?", "expected_doc_ids": [], "expected_keywords": [], "type": "ambiguous"}
+{"expected_doc_ids": ["2505.19134"], "expected_keywords": ["golden questions", "annotation", "incentiv"], "question": "What are golden questions and how do they improve human annotation quality?", "type": "factual"}
+{"question": "What is FunAudioLLM and what does it do?", "expected_doc_ids": ["2407.04051"], "expected_keywords": ["FunAudioLLM", "voice", "foundation"], "type": "factual"}

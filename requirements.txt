@@ -1,0 +1,14 @@
+# EvidenceRAG requirements
+# Install order note: install CPU-only torch FIRST with
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# then install this file, so sentence-transformers reuses the CPU torch build.
+
+fastapi==0.115.6
+uvicorn==0.34.0
+sentence-transformers==3.3.1
+faiss-cpu==1.10.0
+rank-bm25==0.2.2
+numpy==1.26.4
+pypdf==5.1.0
+pytest==8.3.4
+requests==2.32.3

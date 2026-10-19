@@ -1,0 +1,22 @@
+{
+  "2005.11401": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+  "2002.08904": "REALM: Retrieval-Augmented Language Model Pre-Training",
+  "2002.08525": "Leveraging Passage Retrieval with Generative Models for Open Domain Question Answering",
+  "2004.04906": "Dense Passage Retrieval for Open-Domain Question Answering",
+  "2104.08691": "Improving Language Models by Retrieving from Trillions of Tokens (RETRO)",
+  "2309.15217": "RAGAs: Automated Evaluation of Retrieval Augmented Generation",
+  "2307.03172": "Lost in the Middle: How Language Models Use Long Contexts",
+  "2310.11511": "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection",
+  "2401.18059": "Corrective Retrieval Augmented Generation",
+  "2306.05685": "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena",
+  "2303.16634": "G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment",
+  "2312.10997": "RAPTOR: Recursive Abstractive Processing for Tree-Organized Retrieval",
+  "gsad-sdee-2022": "Adaptive Discretization Using Golden Section to Aid Outlier Detection for Software Development Effort Estimation",
+  "2505.19134": "Incentivizing High-Quality Human Annotations with Golden Questions",
+  "electronics-10-02717": "Stock Market Prediction Using Machine Learning Techniques: A Decade Survey on Methodologies, Recent Developments, and Future Directions",
+  "2407.04051": "FunAudioLLM: Voice Understanding and Generation Foundation Models for Natural Interaction Between Humans and LLMs",
+  "2410.08035": "IntrinsicVoice: Empowering LLMs with Intrinsic Real-Time Voice Interaction Abilities",
+  "2501.18096": "MILS: LLMs can see and hear without any training",
+  "pannuke-handcrafted-features": "Evaluation of hand-crafted features with mask images obtained from PanNuke dataset using Bayesian optimization and machine learning models",
+  "cancer-ensemble-segmentation": "Class Probability-guided Ensemble Learning-based Semantic Segmentation to Predict Cancerous Regions on Hematoxylin and Eosin-stained Images"
+}
