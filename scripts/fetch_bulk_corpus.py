@@ -35,12 +35,27 @@ S2_URL = "https://api.semanticscholar.org/graph/v1/paper/search/bulk"
 
 
 def fetch_candidates():
-    """Recent CS papers with arXiv IDs, via the Semantic Scholar bulk API.
+    """Candidate papers: prefer the baked list at data/bulk_ids.tsv
+    (tab-separated arXiv ID + title, committed to the repo). The public
+    search APIs (Semantic Scholar, arXiv) rate-limit shared and residential
+    IPs unpredictably, so the script only falls back to a live lookup when
+    the baked list is missing. Returns [(arxiv_id, title)]."""
+    baked = PROJECT_ROOT / "data" / "bulk_ids.tsv"
+    if baked.exists():
+        candidates = []
+        for line in baked.read_text(encoding="utf-8").splitlines():
+            if "\t" in line:
+                arxiv_id, title = line.split("\t", 1)
+                candidates.append((arxiv_id.strip(), title.strip()))
+        if candidates:
+            print(f"  Using baked candidate list ({len(candidates)} IDs from data/bulk_ids.tsv).")
+            return candidates
+    print("  No baked list found; trying Semantic Scholar...")
+    return _fetch_candidates_semantic_scholar()
 
-    Uses S2 instead of the arXiv search API because the latter rate-limits
-    shared outbound IPs aggressively; PDFs still download from arxiv.org,
-    which is not rate-limited the same way. Returns [(arxiv_id, title)].
-    """
+
+def _fetch_candidates_semantic_scholar():
+    """Live fallback: recent CS papers with arXiv IDs via Semantic Scholar."""
     candidates = []
     params = {
         "fields": "title,externalIds,year",
