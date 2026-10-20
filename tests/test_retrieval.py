@@ -84,6 +84,9 @@ def test_answerable_question_returns_cited_spans(retriever):
         assert citation["page"] == 1
         assert 0 <= citation["char_start"] < citation["char_end"]
         assert 0.0 <= citation["score"] <= 1.0
+        # The source-context view relies on the chunk text carrying the
+        # quoted sentence at exactly the relative offsets.
+        assert span["chunk_text"][span["rel_start"]:span["rel_end"]] == span["text"]
         assert len(span["text"].split()) >= 4
 
 

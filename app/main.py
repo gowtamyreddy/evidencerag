@@ -95,6 +95,9 @@ class Citation(BaseModel):
 
 class AnswerSpan(BaseModel):
     text: str
+    chunk_text: str
+    rel_start: int
+    rel_end: int
     citation: Citation
 
 

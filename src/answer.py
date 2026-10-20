@@ -94,6 +94,9 @@ def extractive_answer(query, ranked_chunks, embedder, threshold=DEFAULT_THRESHOL
         spans.append(
             {
                 "text": text,
+                "chunk_text": chunk["text"],
+                "rel_start": start,
+                "rel_end": end,
                 "citation": {
                     "doc_id": chunk["doc_id"],
                     "page": chunk["page"],

@@ -99,6 +99,28 @@
   footer { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--border);
            font-size: 13px; color: var(--muted); display: flex; justify-content: space-between;
            flex-wrap: wrap; gap: 8px; }
+  .source-btn { margin-top: 8px; font-size: 13px; padding: 6px 12px; border-radius: 999px;
+                background: var(--accent-soft); color: var(--accent); font-weight: 600;
+                border: 0; cursor: pointer; }
+  .drawer-veil { position: fixed; inset: 0; background: rgba(0,0,0,.35); opacity: 0;
+                 pointer-events: none; transition: opacity .2s; z-index: 40; }
+  .drawer-veil.open { opacity: 1; pointer-events: auto; }
+  .drawer { position: fixed; top: 0; right: 0; height: 100dvh; width: min(480px, 94vw);
+            background: var(--surface); border-left: 1px solid var(--border); z-index: 41;
+            transform: translateX(102%); transition: transform .24s ease;
+            display: flex; flex-direction: column; }
+  .drawer.open { transform: translateX(0); }
+  .drawer header { padding: 16px 20px; border-bottom: 1px solid var(--border);
+                   display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .drawer header h3 { margin: 0; font-size: 16px; }
+  .drawer .body { padding: 16px 20px; overflow-y: auto; font-size: 14.5px; }
+  .drawer .docline { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }
+  .drawer .docline code { font-family: ui-monospace, Menlo, monospace; color: var(--text); }
+  .drawer mark { background: #fef08a; color: inherit; border-radius: 3px; padding: 1px 2px; }
+  @media (prefers-color-scheme: dark) { .drawer mark { background: #713f12; } }
+  .close-x { border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+             border-radius: 999px; width: 30px; height: 30px; font-size: 15px; cursor: pointer;
+             display: flex; align-items: center; justify-content: center; padding: 0; }
 </style>
 </head>
 <body>
@@ -182,6 +204,15 @@
     <span><a href="https://github.com/gowtamyreddy/evidencerag" target="_blank" rel="noopener">github.com/gowtamyreddy/evidencerag</a></span>
   </footer>
 </div>
+
+<div class="drawer-veil" id="drawerVeil"></div>
+<aside class="drawer" id="drawer" aria-label="Source context">
+  <header>
+    <h3>Source context</h3>
+    <button class="close-x" id="drawerClose" aria-label="Close">✕</button>
+  </header>
+  <div class="body" id="drawerBody"></div>
+</aside>
 
 <script>
 const out = document.getElementById('out');
@@ -271,6 +302,33 @@ function esc(s) {
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+let lastSpans = [];
+
+function openSource(idx) {
+  const span = lastSpans[idx];
+  if (!span) return;
+  const c = span.citation;
+  const text = span.chunk_text;
+  const marked = esc(text.slice(0, span.rel_start)) +
+    '<mark>' + esc(text.slice(span.rel_start, span.rel_end)) + '</mark>' +
+    esc(text.slice(span.rel_end));
+  document.getElementById('drawerBody').innerHTML =
+    `<p class="docline">Document <code>${esc(c.doc_id)}</code> · page ${c.page} · ` +
+    `chars ${c.char_start}–${c.char_end} of the page · sentence score ${c.score.toFixed(3)}</p>` +
+    `<p style="margin:0">${marked}</p>` +
+    `<p class="meta" style="margin-top:14px">This is the exact chunk the retriever returned, with the ` +
+    `quoted sentence highlighted in place. The citation's character offsets point at this highlight.</p>`;
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerVeil').classList.add('open');
+}
+function closeSource() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerVeil').classList.remove('open');
+}
+document.getElementById('drawerClose').addEventListener('click', closeSource);
+document.getElementById('drawerVeil').addEventListener('click', closeSource);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSource(); });
+
 async function ask(question) {
   out.innerHTML = '';
   btn.disabled = true;
@@ -284,17 +342,19 @@ async function ask(question) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     const answered = d.status === 'answered';
+    lastSpans = d.answer_spans;
     let html = `<div style="margin-top:18px"><span class="badge ${answered ? 'ok' : 'refused'}">${
       answered ? '✓ Answered with citations' : 'Insufficient evidence — refusing to guess'}</span>`;
     if (!answered) {
       html += `<p class="meta">No sentence in the corpus scored high enough to quote. That is the design: a citation system that guesses is worse than one that refuses.</p>`;
     }
-    for (const span of d.answer_spans) {
+    d.answer_spans.forEach((span, i) => {
       const c = span.citation;
       html += `<div class="span"><p class="quote">&ldquo;${esc(span.text)}&rdquo;</p>` +
         `<p class="cite">Source: <code>${esc(c.doc_id)}</code> · page ${c.page} · ` +
-        `chars ${c.char_start}–${c.char_end} · score ${c.score.toFixed(3)}</p></div>`;
-    }
+        `chars ${c.char_start}–${c.char_end} · score ${c.score.toFixed(3)}</p>` +
+        `<button type="button" class="source-btn" data-source="${i}">View source in context →</button></div>`;
+    });
     html += `<p class="meta">Latency: ${d.latency_ms} ms · ranking: ${d.reranked ? 'cross-encoder rerank over fused top-20' : 'RRF fusion only'}</p></div>`;
     out.innerHTML = html;
   } catch (e) {
@@ -308,6 +368,10 @@ document.getElementById('ask').addEventListener('submit', e => {
   e.preventDefault();
   const q = input.value.trim();
   if (q) ask(q);
+});
+out.addEventListener('click', e => {
+  const sourceBtn = e.target.closest('[data-source]');
+  if (sourceBtn) openSource(Number(sourceBtn.dataset.source));
 });
 document.querySelectorAll('.chip[data-q]').forEach(chip =>
   chip.addEventListener('click', () => { input.value = chip.dataset.q; ask(chip.dataset.q); }));
