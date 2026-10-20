@@ -49,6 +49,17 @@
     <a data-q="What is the capital of France?">What is the capital of France?</a>
   </p>
 
+  <div class="card" id="uploadCard">
+    <p style="margin:0 0 8px"><strong>Bring your own papers</strong></p>
+    <p class="meta" style="margin:0 0 10px">Upload a .zip of PDFs to replace the corpus. The same pipeline (chunk, embed, FAISS) rebuilds the index live; questions then answer from your papers only.</p>
+    <form id="uploadForm">
+      <input type="file" id="zipfile" accept=".zip" style="flex:1">
+      <button type="submit" id="uploadBtn">Replace corpus</button>
+    </form>
+    <p class="meta" id="uploadStatus"></p>
+    <button id="resetBtn" style="background:#6b7280; display:none">Reset to built-in corpus</button>
+  </div>
+
   <div id="out"></div>
 </div>
 
@@ -62,11 +73,54 @@ async function showHealth() {
   try {
     const r = await fetch('/health');
     const h = await r.json();
-    el.textContent = `Server ok · ${h.chunks.toLocaleString()} chunks · ${h.docs.length} documents indexed`;
+    el.textContent = `Server ok · ${h.chunks.toLocaleString()} chunks · ${h.docs.length} documents indexed · corpus: ${h.corpus}${h.building ? ' · building…' : ''}`;
+    document.getElementById('resetBtn').style.display = h.corpus === 'upload' ? '' : 'none';
   } catch (e) {
     el.textContent = 'Server not reachable.';
   }
 }
+
+let pollTimer = null;
+async function pollStatus() {
+  try {
+    const r = await fetch('/upload/status');
+    const s = await r.json();
+    const el = document.getElementById('uploadStatus');
+    if (s.error) {
+      el.textContent = 'Build failed: ' + s.error;
+    } else if (!s.building) {
+      el.textContent = `Active corpus: ${s.corpus} — ${s.docs.length} documents, ${s.chunks.toLocaleString()} chunks.`;
+    }
+    showHealth();
+    if (!s.building && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  } catch (e) { /* keep polling */ }
+}
+
+document.getElementById('uploadForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = document.getElementById('zipfile').files[0];
+  const el = document.getElementById('uploadStatus');
+  if (!f) { el.textContent = 'Pick a .zip file first.'; return; }
+  const fd = new FormData();
+  fd.append('file', f);
+  el.textContent = 'Uploading…';
+  try {
+    const r = await fetch('/upload', {method: 'POST', body: fd});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+    el.textContent = `Building index for ${d.docs.length} papers (embedding takes ~10s per paper)…`;
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(pollStatus, 2000);
+  } catch (err) {
+    el.textContent = 'Upload failed: ' + err.message;
+  }
+});
+
+document.getElementById('resetBtn').addEventListener('click', async () => {
+  await fetch('/corpus/reset', {method: 'POST'});
+  document.getElementById('uploadStatus').textContent = 'Back to the built-in corpus.';
+  showHealth();
+});
 
 function esc(s) {
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

@@ -12,3 +12,4 @@ numpy==1.26.4
 pypdf==5.1.0
 pytest==8.3.4
 requests==2.32.3
+python-multipart==0.0.20

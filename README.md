@@ -46,6 +46,10 @@ The v1 corpus is twenty papers: arXiv papers on retrieval-augmented generation a
                       tests/               citation precision; failure cases
 ```
 
+## Demo UI and dynamic upload (v1.1)
+
+Open `http://localhost:8000/` for the browser demo: a search box with clickable examples, quoted answer spans with citations, and a corpus upload card. Uploading a `.zip` of PDFs replaces the active corpus: the same ingest → embed → FAISS pipeline runs as a background job (`POST /upload`), the UI polls `GET /upload/status` until the index swaps in, and `/query` answers 503 while the build runs. `POST /corpus/reset` restores the built-in corpus. The static golden eval (hit@1, MRR) still applies per-corpus: the same harness can score whatever corpus is active.
+
 ## How to run
 
 ```bash
