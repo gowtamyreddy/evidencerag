@@ -56,6 +56,10 @@
       <input type="file" id="zipfile" accept=".zip" style="flex:1">
       <button type="submit" id="uploadBtn">Replace corpus</button>
     </form>
+    <form id="fetchForm" style="margin-top:8px">
+      <input type="text" id="fetchUrl" placeholder="…or paste a PDF or page URL to add it" style="flex:1; padding:10px 12px; font-size:16px; border:1px solid #8888; border-radius:8px" autocomplete="off">
+      <button type="submit" id="fetchBtn">Add URL</button>
+    </form>
     <p class="meta" id="uploadStatus"></p>
     <button id="resetBtn" style="background:#6b7280; display:none">Reset to built-in corpus</button>
   </div>
@@ -120,6 +124,29 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
   await fetch('/corpus/reset', {method: 'POST'});
   document.getElementById('uploadStatus').textContent = 'Back to the built-in corpus.';
   showHealth();
+});
+
+document.getElementById('fetchForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const url = document.getElementById('fetchUrl').value.trim();
+  const el = document.getElementById('uploadStatus');
+  if (!url) { el.textContent = 'Paste a URL first.'; return; }
+  el.textContent = 'Fetching ' + url + '…';
+  try {
+    const r = await fetch('/fetch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+    el.textContent = `Added "${d.doc}" — building index (embedding takes ~10s per document)…`;
+    document.getElementById('fetchUrl').value = '';
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(pollStatus, 2000);
+  } catch (err) {
+    el.textContent = 'Fetch failed: ' + err.message;
+  }
 });
 
 function esc(s) {

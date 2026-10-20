@@ -8,6 +8,7 @@ venv/
 
 # Build artifacts (regenerable via scripts/build_index.py)
 data/artifacts/
+data/uploads/
 *.faiss
 *.npy
 
