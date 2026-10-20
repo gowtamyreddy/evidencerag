@@ -41,6 +41,7 @@
 
   <form id="ask">
     <input type="text" id="q" placeholder="Ask a question about the corpus…" autocomplete="off">
+    <button type="button" id="mic" title="Ask by voice">🎙 Speak</button>
     <button type="submit" id="go">Ask</button>
   </form>
   <p class="examples">Try:
@@ -190,6 +191,50 @@ document.getElementById('ask').addEventListener('submit', e => {
   const q = input.value.trim();
   if (q) ask(q);
 });
+
+// Voice input: the browser's built-in speech recognition fills the question
+// box and auto-asks on the final transcript. Works on localhost/HTTPS in
+// Chrome, Edge, and Safari; hidden where unsupported (e.g. Firefox).
+const micBtn = document.getElementById('mic');
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRecognition) {
+  micBtn.style.display = 'none';
+} else {
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  let listening = false;
+
+  recognition.addEventListener('result', e => {
+    let interim = '', finalText = '';
+    for (const result of e.results) {
+      if (result.isFinal) finalText += result[0].transcript;
+      else interim += result[0].transcript;
+    }
+    input.value = finalText || interim;
+    if (finalText) {
+      const q = finalText.trim();
+      if (q) ask(q);
+    }
+  });
+  recognition.addEventListener('start', () => {
+    listening = true;
+    micBtn.textContent = '🔴 Listening…';
+    micBtn.disabled = true;
+  });
+  recognition.addEventListener('end', () => {
+    listening = false;
+    micBtn.textContent = '🎙 Speak';
+    micBtn.disabled = false;
+  });
+  recognition.addEventListener('error', e => {
+    if (e.error === 'not-allowed') {
+      micBtn.textContent = '🎙 Mic blocked';
+      setTimeout(() => { micBtn.textContent = '🎙 Speak'; }, 2500);
+    }
+  });
+  micBtn.addEventListener('click', () => { if (!listening) recognition.start(); });
+}
 document.querySelectorAll('.examples a').forEach(a =>
   a.addEventListener('click', () => { input.value = a.dataset.q; ask(a.dataset.q); }));
 
