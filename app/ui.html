@@ -192,49 +192,59 @@ document.getElementById('ask').addEventListener('submit', e => {
   if (q) ask(q);
 });
 
-// Voice input: the browser's built-in speech recognition fills the question
-// box and auto-asks on the final transcript. Works on localhost/HTTPS in
-// Chrome, Edge, and Safari; hidden where unsupported (e.g. Firefox).
+// Voice input: record with MediaRecorder, transcribe server-side with
+// faster-whisper (local model — audio never leaves this machine), fill the
+// question box, and auto-ask. Click Speak to start, click again to stop.
 const micBtn = document.getElementById('mic');
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (!SpeechRecognition) {
-  micBtn.style.display = 'none';
-} else {
-  const recognition = new SpeechRecognition();
-  recognition.lang = 'en-US';
-  recognition.interimResults = true;
-  let listening = false;
+let mediaRecorder = null, audioChunks = [], recording = false;
 
-  recognition.addEventListener('result', e => {
-    let interim = '', finalText = '';
-    for (const result of e.results) {
-      if (result.isFinal) finalText += result[0].transcript;
-      else interim += result[0].transcript;
-    }
-    input.value = finalText || interim;
-    if (finalText) {
-      const q = finalText.trim();
-      if (q) ask(q);
-    }
-  });
-  recognition.addEventListener('start', () => {
-    listening = true;
-    micBtn.textContent = '🔴 Listening…';
-    micBtn.disabled = true;
-  });
-  recognition.addEventListener('end', () => {
-    listening = false;
-    micBtn.textContent = '🎙 Speak';
-    micBtn.disabled = false;
-  });
-  recognition.addEventListener('error', e => {
-    if (e.error === 'not-allowed') {
-      micBtn.textContent = '🎙 Mic blocked';
-      setTimeout(() => { micBtn.textContent = '🎙 Speak'; }, 2500);
-    }
-  });
-  micBtn.addEventListener('click', () => { if (!listening) recognition.start(); });
-}
+micBtn.addEventListener('click', async () => {
+  if (recording) { mediaRecorder.stop(); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    micBtn.textContent = '🎙 Not supported';
+    setTimeout(() => { micBtn.textContent = '🎙 Speak'; }, 2000);
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+      .find(t => MediaRecorder.isTypeSupported(t)) || '';
+    mediaRecorder = new MediaRecorder(stream, mimeType ? {mimeType} : undefined);
+    audioChunks = [];
+    mediaRecorder.addEventListener('dataavailable', e => { if (e.data.size) audioChunks.push(e.data); });
+    mediaRecorder.addEventListener('stop', async () => {
+      stream.getTracks().forEach(t => t.stop());
+      recording = false;
+      micBtn.textContent = '✍️ Transcribing…';
+      micBtn.disabled = true;
+      const blob = new Blob(audioChunks, {type: mediaRecorder.mimeType || 'audio/webm'});
+      const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+      const fd = new FormData();
+      fd.append('file', blob, 'recording.' + ext);
+      try {
+        const r = await fetch('/stt', {method: 'POST', body: fd});
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+        input.value = d.text;
+        const q = d.text.trim();
+        if (q) ask(q);
+      } catch (err) {
+        input.value = '';
+        input.placeholder = 'Voice: ' + err.message + ' (the first use downloads the speech model, ~150 MB)';
+        setTimeout(() => { input.placeholder = 'Ask a question about the corpus…'; }, 6000);
+      } finally {
+        micBtn.textContent = '🎙 Speak';
+        micBtn.disabled = false;
+      }
+    });
+    mediaRecorder.start();
+    recording = true;
+    micBtn.textContent = '🔴 Stop & ask';
+  } catch (e) {
+    micBtn.textContent = '🎙 Mic blocked';
+    setTimeout(() => { micBtn.textContent = '🎙 Speak'; }, 2500);
+  }
+});
 document.querySelectorAll('.examples a').forEach(a =>
   a.addEventListener('click', () => { input.value = a.dataset.q; ask(a.dataset.q); }));
 

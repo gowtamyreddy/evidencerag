@@ -20,6 +20,10 @@ POST /fetch {"url": "https://..."} -> 202 {"status": "building", "doc": "..."}
   Fetches a PDF or web page, appends it to the dynamic corpus, and rebuilds
   the index in the background. Repeats of the same URL get a numeric suffix.
 
+POST /stt (multipart form field "file", recorded audio)
+  -> {"text": "..."} transcribed locally by faster-whisper (base, int8 CPU).
+  Powers the voice button: audio never leaves this machine.
+
 POST /corpus/reset -> restore the built-in corpus from data/artifacts/.
 
 The default corpus loads once at startup from data/artifacts/. Build it
@@ -65,6 +69,7 @@ app.add_middleware(
 
 _retriever = None
 _default_retriever = None
+_whisper_model = None
 _state_lock = threading.Lock()
 _state = {"building": False, "corpus": "default", "error": None}
 
@@ -338,6 +343,71 @@ def upload_status():
         "docs": docs,
         "chunks": len(_retriever.chunks),
     }
+
+
+def _decode_audio_to_array(path):
+    """Decode any audio file to a 16 kHz mono float32 numpy array.
+
+    faster-whisper's own decode path pins an old PyAV API (it passes
+    metadata_errors= to av.open, removed in PyAV 15+). Decoding here with the
+    stable PyAV API keeps the endpoint working across PyAV versions, and
+    faster-whisper accepts a numpy array directly.
+    """
+    import av
+    import numpy as np
+
+    container = av.open(str(path))
+    resampler = av.AudioResampler(format="fltp", layout="mono", rate=16000)
+    pieces = []
+    for frame in container.decode(audio=0):
+        for resampled in resampler.resample(frame):
+            pieces.append(resampled.to_ndarray().reshape(-1))
+    if pieces:
+        return np.concatenate(pieces).astype(np.float32)
+    return np.zeros(0, dtype=np.float32)
+
+
+def _get_whisper():
+    """Lazy-load faster-whisper (base, int8 CPU) on first use.
+
+    The model downloads once from HuggingFace (~150 MB) and is then cached,
+    so the first transcription takes longer than the rest. Kept lazy because
+    most sessions never touch the mic button.
+    """
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+
+        _whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+    return _whisper_model
+
+
+@app.post("/stt")
+async def speech_to_text(file: UploadFile = File(...)):
+    """Transcribe recorded audio (webm/wav/mp3) into text with faster-whisper.
+
+    Called by the mic button in the demo UI. Audio never leaves this machine:
+    unlike the browser's built-in speech recognition, nothing is sent to a
+    vendor's cloud service.
+    """
+    import tempfile
+
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio recording.")
+    if len(audio_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Recording is larger than 10 MB.")
+    suffix = Path(file.filename or "recording").suffix or ".webm"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        tmp.write(audio_bytes)
+        tmp.flush()
+        samples = _decode_audio_to_array(tmp.name)
+        model = _get_whisper()
+        segments, _info = model.transcribe(samples, language="en", vad_filter=True)
+        text = " ".join(segment.text.strip() for segment in segments).strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="No speech detected in the recording.")
+    return {"text": text}
 
 
 @app.post("/corpus/reset")
