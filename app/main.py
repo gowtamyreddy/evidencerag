@@ -46,7 +46,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from src import answer as answer_module
-from src import embed, index as vector_index, ingest, retrieve
+from src import embed, index as vector_index, ingest, rerank, retrieve
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS_DIR = PROJECT_ROOT / "data" / "artifacts"
@@ -70,6 +70,7 @@ app.add_middleware(
 _retriever = None
 _default_retriever = None
 _whisper_model = None
+_reranker = None
 _state_lock = threading.Lock()
 _state = {"building": False, "corpus": "default", "error": None}
 
@@ -77,6 +78,7 @@ _state = {"building": False, "corpus": "default", "error": None}
 class QueryRequest(BaseModel):
     question: str = Field(..., min_length=3, description="The question to answer.")
     top_k: int = Field(5, ge=1, le=20, description="Retrieved chunks to consider.")
+    rerank: bool = Field(True, description="Apply the cross-encoder rerank stage.")
 
 
 class FetchRequest(BaseModel):
@@ -101,6 +103,7 @@ class QueryResponse(BaseModel):
     answer_spans: list[AnswerSpan]
     citations: list[Citation]
     latency_ms: int
+    reranked: bool
 
 
 def build_retriever_from_dir(uploads_dir, embedder):
@@ -206,6 +209,14 @@ def health():
     }
 
 
+def _get_reranker():
+    """Lazy-load the cross-encoder (downloads ~90 MB on first use)."""
+    global _reranker
+    if _reranker is None:
+        _reranker = rerank.Reranker()
+    return _reranker
+
+
 @app.post("/query", response_model=QueryResponse)
 def query(request: QueryRequest):
     with _state_lock:
@@ -213,7 +224,12 @@ def query(request: QueryRequest):
     if building:
         raise HTTPException(status_code=503, detail="Index is building; try again shortly.")
     started = time.perf_counter()
-    ranked = _retriever.hybrid_search(request.question, top_k=request.top_k)
+    fused = _retriever.hybrid_search(request.question, top_k=20)
+    reranked = False
+    ranked = fused[: request.top_k]
+    if request.rerank:
+        ranked = rerank.rerank(request.question, fused, _get_reranker(), request.top_k)
+        reranked = True
     result = answer_module.extractive_answer(request.question, ranked, _retriever.embedder)
     latency_ms = int((time.perf_counter() - started) * 1000)
     citations = [span["citation"] for span in result["spans"]]
@@ -222,6 +238,7 @@ def query(request: QueryRequest):
         answer_spans=result["spans"],
         citations=citations,
         latency_ms=latency_ms,
+        reranked=reranked,
     )
 
 

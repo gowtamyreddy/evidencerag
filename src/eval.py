@@ -22,9 +22,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src import embed, index as vector_index, ingest, retrieve  # noqa: E402
+from src import embed, index as vector_index, ingest, rerank as rerank_module, retrieve  # noqa: E402
 
 EVAL_TOP_K = 5
+RERANK_CANDIDATES = 20  # first-stage depth the cross-encoder reorders
 
 
 def load_golden(path):
@@ -60,24 +61,24 @@ def rank_of_expected(ranked_chunks, expected_doc_ids):
     return None
 
 
-def evaluate(retriever, golden, top_k=EVAL_TOP_K):
+def evaluate(retriever, golden, top_k=EVAL_TOP_K, reranker=None):
     """Run every golden question and aggregate the metrics.
 
-    Unanswerable and ambiguous questions are excluded from the retrieval
-    metrics: for them the correct behavior is insufficient_evidence, not
-    retrieval, so scoring them as misses would punish honest refusal.
+    With a reranker, the first stage retrieves RERANK_CANDIDATES chunks and
+    the cross-encoder reorders them before the top_k window is taken — the
+    same two-stage pipeline the API runs.
     """
     answerable = [
         entry for entry in golden
         if entry.get("type") not in ("unanswerable", "ambiguous")
     ]
-    graceful = [
-        entry for entry in golden
-        if entry.get("type") in ("unanswerable", "ambiguous")
-    ]
     results = []
     for entry in answerable:
-        ranked = retriever.hybrid_search(entry["question"], top_k=top_k)
+        if reranker is not None:
+            fused = retriever.hybrid_search(entry["question"], top_k=RERANK_CANDIDATES)
+            ranked = rerank_module.rerank(entry["question"], fused, reranker, top_k)
+        else:
+            ranked = retriever.hybrid_search(entry["question"], top_k=top_k)
         rank = rank_of_expected(ranked, entry["expected_doc_ids"])
         hits = sum(1 for chunk, _ in ranked if chunk["doc_id"] in entry["expected_doc_ids"])
         results.append(
@@ -111,12 +112,19 @@ def print_table(summary):
 
 def main():
     artifacts_dir = PROJECT_ROOT / "data" / "artifacts"
-    golden_path = Path(sys.argv[1]) if len(sys.argv) > 1 else PROJECT_ROOT / "data" / "golden_sample.jsonl"
+    args = [a for a in sys.argv[1:] if a != "--rerank"]
+    use_rerank = "--rerank" in sys.argv
+    golden_path = Path(args[0]) if args else PROJECT_ROOT / "data" / "golden_sample.jsonl"
     print("Loading retriever...")
     retriever = load_retriever(artifacts_dir)
+    reranker = None
+    if use_rerank:
+        print("Loading cross-encoder reranker...")
+        reranker = rerank_module.Reranker()
     golden = load_golden(golden_path)
-    print(f"Evaluating {len(golden)} golden questions...\n")
-    results = evaluate(retriever, golden)
+    mode = "hybrid + cross-encoder rerank" if use_rerank else "hybrid (dense + BM25 + RRF)"
+    print(f"Evaluating {len(golden)} golden questions (mode: {mode})...\n")
+    results = evaluate(retriever, golden, reranker=reranker)
     for entry in results:
         rank = entry["rank"] if entry["rank"] is not None else "miss"
         print(f"[{entry['type']:<10}] rank={rank:<4} {entry['question'][:70]}")

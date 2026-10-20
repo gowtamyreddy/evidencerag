@@ -48,6 +48,7 @@
     <a data-q="What problem does retrieval-augmented generation solve?">What problem does RAG solve?</a> ·
     <a data-q="How does RAGAS evaluate RAG pipelines without references?">How does RAGAS evaluate?</a> ·
     <a data-q="What is the capital of France?">What is the capital of France?</a>
+    &nbsp;&nbsp;<label style="cursor:pointer"><input type="checkbox" id="rerankToggle" checked> cross-encoder rerank</label>
   </p>
 
   <div class="card" id="uploadCard">
@@ -157,11 +158,12 @@ function esc(s) {
 async function ask(question) {
   out.innerHTML = '';
   btn.disabled = true;
+  const useRerank = document.getElementById('rerankToggle').checked;
   try {
     const r = await fetch('/query', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({question})
+      body: JSON.stringify({question, rerank: useRerank})
     });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
@@ -177,7 +179,7 @@ async function ask(question) {
         `<p class="cite">Source: <code>${esc(c.doc_id)}</code> · page ${c.page} · ` +
         `chars ${c.char_start}–${c.char_end} · score ${c.score.toFixed(3)}</p></div>`;
     }
-    html += `<p class="meta">Latency: ${d.latency_ms} ms</p></div>`;
+    html += `<p class="meta">Latency: ${d.latency_ms} ms · ranking: ${d.reranked ? 'cross-encoder rerank over fused top-20' : 'RRF fusion only'}</p></div>`;
     out.innerHTML = html;
   } catch (e) {
     out.innerHTML = `<p class="error">Something went wrong: ${esc(e.message)}</p>`;

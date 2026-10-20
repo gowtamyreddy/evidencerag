@@ -50,6 +50,22 @@ The v1 corpus is twenty papers: arXiv papers on retrieval-augmented generation a
 
 Open `http://localhost:8000/` for the browser demo: a search box with clickable examples, a 🎙 voice button (click to record, click again to stop — the recording is transcribed by a local faster-whisper model via `POST /stt`, so audio never leaves the machine), quoted answer spans with citations, and a corpus upload card. Uploading a `.zip` of PDFs replaces the active corpus: the same ingest → embed → FAISS pipeline runs as a background job (`POST /upload`), the UI polls `GET /upload/status` until the index swaps in, and `/query` answers 503 while the build runs. `POST /fetch` accepts a URL instead: a PDF link or a web page is downloaded, its text extracted, appended to the dynamic corpus (repeats get a numeric suffix), and the index rebuilt the same way. `POST /corpus/reset` restores the built-in corpus. The static golden eval (hit@1, MRR) still applies per-corpus: the same harness can score whatever corpus is active.
 
+## Cross-encoder reranking (v1.5)
+
+Retrieval runs in two stages. Stage one (dense + BM25 fused with RRF) optimizes for recall over the whole corpus; stage two reorders the fused top-20 with a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`), which reads the query and each candidate chunk *together* and is far better at judging true relevance. The failure analysis above is what motivated it: two of the three rank-1 misses were ordering problems where generic vocabulary matched strongly across both first-stage signals.
+
+Measured on the 18-question golden set (16 answerable, reranker lazy-loaded, no corpus changes between runs):
+
+| metric | stage 1 only | stage 1 + rerank |
+|---|---|---|
+| hit@1 | 0.812 | 1.000 |
+| MRR | 0.896 | 1.000 |
+| citation precision | 0.850 | 0.975 |
+
+Reproduce: `.venv/bin/python src/eval.py data/golden_questions_v1.jsonl` vs the same command with `--rerank`. The API applies reranking by default (`rerank: true` in the query body, or the checkbox in the demo UI); pass `rerank: false` to skip it.
+
+Honest tradeoffs: the reranker adds a few seconds per query on CPU (the model is ~90 MB, downloaded once), so the demo UI makes it optional. And it cannot rescue a question whose right chunk falls outside the fused top-20: stage two can only reorder what stage one retrieved. That is exactly what a first-stage recall measurement would show, and it is why hit@3/hit@5 were 1.000 even before the fix.
+
 ## How to run
 
 ```bash
@@ -108,6 +124,7 @@ evidencerag/
   src/embed.py         sentence-transformers wrapper, normalized vectors
   src/index.py         FAISS index build/search/save/load
   src/retrieve.py      dense + BM25 + reciprocal rank fusion
+  src/rerank.py        cross-encoder rerank stage over the fused top-20
   src/answer.py        extractive sentence scoring with citations
   src/eval.py          golden-set metrics: hit@k, MRR, citation precision
   app/main.py          FastAPI: POST /query, GET /health

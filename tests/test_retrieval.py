@@ -16,6 +16,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src import answer as answer_module  # noqa: E402
 from src import embed, index as vector_index  # noqa: E402
 from src import ingest, retrieve  # noqa: E402
+from src import rerank as rerank_module  # noqa: E402
 
 SYNTHETIC_DOCS = {
     "doc_a": (
@@ -128,3 +129,28 @@ def test_chunk_offsets_reconstruct_text():
     text = "The quick brown fox jumps over the lazy dog near the river bank."
     for piece, start, end in ingest.chunk_text(text, chunk_size=20, overlap=5):
         assert text[start:end] == piece
+
+
+class _StubReranker:
+    """Scores chunks by a fixed keyword so ordering is fully deterministic."""
+
+    def __init__(self, keyword):
+        self.keyword = keyword
+
+    def score(self, query, texts):
+        return [1.0 if self.keyword in text else 0.0 for text in texts]
+
+
+def test_rerank_reorders_by_cross_encoder_score():
+    """A chunk the fusion stages ranked last must win if the cross-encoder
+    scores it highest — that reordering is the entire point of stage two."""
+    chunks = [
+        {"doc_id": "generic", "page": 1, "char_start": 0, "char_end": 10,
+         "text": "retrieval retrieval retrieval generic words"},
+        {"doc_id": "specific", "page": 1, "char_start": 0, "char_end": 10,
+         "text": "the precise answer mentions goldenneedle here"},
+    ]
+    fused = [(chunks[0], 0.9), (chunks[1], 0.1)]  # fusion prefers generic
+    ranked = rerank_module.rerank("q", fused, _StubReranker("goldenneedle"), top_k=2)
+    assert ranked[0][0]["doc_id"] == "specific"
+    assert ranked[0][1] == 1.0
