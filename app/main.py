@@ -16,6 +16,8 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from src import answer as answer_module
@@ -23,8 +25,18 @@ from src import embed, index as vector_index, ingest, retrieve
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS_DIR = PROJECT_ROOT / "data" / "artifacts"
+UI_FILE = Path(__file__).resolve().parent / "ui.html"
 
 app = FastAPI(title="EvidenceRAG", version="0.1.0")
+
+# The demo page is served from this app, but also allow file:// and local
+# static servers during development.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 _retriever = None
 
@@ -66,6 +78,11 @@ def load_pipeline():
 def startup():
     global _retriever
     _retriever = load_pipeline()
+
+
+@app.get("/")
+def home():
+    return FileResponse(UI_FILE, media_type="text/html")
 
 
 @app.get("/health")

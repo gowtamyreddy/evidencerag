@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EvidenceRAG</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         margin: 0; padding: 24px 16px; line-height: 1.5; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  .sub { opacity: .75; margin: 0 0 20px; }
+  #health { font-size: 13px; opacity: .75; margin-bottom: 16px; }
+  form { display: flex; gap: 8px; }
+  input[type=text] { flex: 1; padding: 10px 12px; font-size: 16px;
+                     border: 1px solid #8888; border-radius: 8px; }
+  button { padding: 10px 18px; font-size: 16px; border: 0; border-radius: 8px;
+           background: #2563eb; color: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; }
+  .examples { margin: 12px 0 0; font-size: 14px; opacity: .85; }
+  .examples a { cursor: pointer; text-decoration: underline; }
+  .card { border: 1px solid #8888; border-radius: 10px; padding: 14px 16px;
+          margin-top: 16px; }
+  .quote { font-style: italic; margin: 0 0 8px; }
+  .cite { font-size: 13px; opacity: .8; }
+  .cite code { font-family: ui-monospace, monospace; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px;
+           font-size: 13px; font-weight: 600; }
+  .ok { background: #16a34a33; }
+  .refused { background: #dc262633; }
+  .meta { font-size: 13px; opacity: .7; margin-top: 10px; }
+  .error { color: #dc2626; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>EvidenceRAG</h1>
+  <p class="sub">Document QA that proves where its answers came from. Every answer is a quoted span with an exact citation.</p>
+  <div id="health">Checking server…</div>
+
+  <form id="ask">
+    <input type="text" id="q" placeholder="Ask a question about the corpus…" autocomplete="off">
+    <button type="submit" id="go">Ask</button>
+  </form>
+  <p class="examples">Try:
+    <a data-q="What problem does retrieval-augmented generation solve?">What problem does RAG solve?</a> ·
+    <a data-q="How does RAGAS evaluate RAG pipelines without references?">How does RAGAS evaluate?</a> ·
+    <a data-q="What is the capital of France?">What is the capital of France?</a>
+  </p>
+
+  <div id="out"></div>
+</div>
+
+<script>
+const out = document.getElementById('out');
+const btn = document.getElementById('go');
+const input = document.getElementById('q');
+
+async function showHealth() {
+  const el = document.getElementById('health');
+  try {
+    const r = await fetch('/health');
+    const h = await r.json();
+    el.textContent = `Server ok · ${h.chunks.toLocaleString()} chunks · ${h.docs.length} documents indexed`;
+  } catch (e) {
+    el.textContent = 'Server not reachable.';
+  }
+}
+
+function esc(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function ask(question) {
+  out.innerHTML = '';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/query', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question})
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const answered = d.status === 'answered';
+    let html = `<div class="card"><span class="badge ${answered ? 'ok' : 'refused'}">${
+      answered ? 'Answered with citations' : 'Insufficient evidence — refusing to guess'}</span>`;
+    if (!answered) {
+      html += `<p class="meta">No sentence in the corpus scored high enough to quote. That is the design: a citation system that guesses is worse than one that refuses.</p>`;
+    }
+    for (const span of d.answer_spans) {
+      const c = span.citation;
+      html += `<div class="card"><p class="quote">&ldquo;${esc(span.text)}&rdquo;</p>` +
+        `<p class="cite">Source: <code>${esc(c.doc_id)}</code> · page ${c.page} · ` +
+        `chars ${c.char_start}–${c.char_end} · score ${c.score.toFixed(3)}</p></div>`;
+    }
+    html += `<p class="meta">Latency: ${d.latency_ms} ms</p></div>`;
+    out.innerHTML = html;
+  } catch (e) {
+    out.innerHTML = `<p class="error">Something went wrong: ${esc(e.message)}</p>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('ask').addEventListener('submit', e => {
+  e.preventDefault();
+  const q = input.value.trim();
+  if (q) ask(q);
+});
+document.querySelectorAll('.examples a').forEach(a =>
+  a.addEventListener('click', () => { input.value = a.dataset.q; ask(a.dataset.q); }));
+
+showHealth();
+</script>
+</body>
+</html>
