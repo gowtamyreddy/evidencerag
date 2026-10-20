@@ -6,7 +6,7 @@ Boone builds the machinery. You own the judgment: the corpus, the golden questio
 
 ## Phase 0 — Corpus + golden set (tonight, ~1 hr)
 
-- [ ] Corpus: default is ~12 arXiv papers on RAG + LLM evaluation. Tell me if you want a different corpus; otherwise it's locked in.
+- [ ] Corpus: 20 curated papers (16 fetch from arXiv via scripts/fetch_corpus.py, 4 contributed journal PDFs). All identity-verified — see data/papers/CONTENT_NOTES.md and scripts/validate_corpus.py.
 - [ ] Skim 3–4 papers (abstracts + conclusions are enough). Write each paper's one-line claim in your own words.
 - [ ] Write 20–30 golden questions, one JSON object per line:
   `{"question": "...", "expected_doc_id": "<arXiv id>", "expected_keywords": ["distinctive", "phrases"], "type": "factual|comparison|ambiguous|unanswerable"}`

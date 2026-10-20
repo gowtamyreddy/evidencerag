@@ -169,3 +169,32 @@ def test_clean_text_strips_lone_surrogates():
     cleaned = ingest.clean_text(dirty)
     cleaned.encode("utf-8")  # raises if a lone surrogate survived
     assert "Vision" in cleaned and "more" in cleaned
+
+
+def test_sentence_offsets_handle_repeated_sentences():
+    """The same sentence twice in one chunk must get two distinct spans,
+    each slicing back to the sentence — find-from-cursor, not find-from-0."""
+    text = "Results improve with scale. Results improve with scale. Other text here now."
+    spans = answer_module._sentences_with_offsets(text)
+    repeated = [(s, a, b) for s, a, b in spans if s.startswith("Results improve")]
+    assert len(repeated) == 2
+    assert repeated[0][1] < repeated[1][1]
+    for sentence, start, end in spans:
+        assert text[start:end] == sentence
+
+
+def test_empty_pages_produce_no_chunks():
+    """Blank pages (scanned-image pages, separators) must not create
+    chunks, and must not shift the page numbers of later pages."""
+    pages = [(1, ""), (2, "   "), (3, "Real content lives on this page here.")]
+    chunks = ingest.chunk_pages("doc_x", pages)
+    assert len(chunks) == 1
+    assert chunks[0]["page"] == 3
+
+
+def test_unicode_text_chunks_reconstruct():
+    """Curly quotes, em dashes, and accented characters survive chunking
+    with offsets that still slice back to the exact chunk text."""
+    text = "L'évaluation «hybride» — dense et lexical — améliore la précision des citations."
+    for piece, start, end in ingest.chunk_text(text, chunk_size=30, overlap=5):
+        assert text[start:end] == piece

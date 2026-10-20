@@ -1,22 +1,302 @@
 {
-  "2005.11401": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
-  "2002.08904": "REALM: Retrieval-Augmented Language Model Pre-Training",
-  "2002.08525": "Leveraging Passage Retrieval with Generative Models for Open Domain Question Answering",
-  "2004.04906": "Dense Passage Retrieval for Open-Domain Question Answering",
-  "2104.08691": "Improving Language Models by Retrieving from Trillions of Tokens (RETRO)",
-  "2309.15217": "RAGAs: Automated Evaluation of Retrieval Augmented Generation",
-  "2307.03172": "Lost in the Middle: How Language Models Use Long Contexts",
-  "2310.11511": "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection",
-  "2401.18059": "Corrective Retrieval Augmented Generation",
-  "2306.05685": "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena",
-  "2303.16634": "G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment",
-  "2312.10997": "RAPTOR: Recursive Abstractive Processing for Tree-Organized Retrieval",
-  "gsad-sdee-2022": "Adaptive Discretization Using Golden Section to Aid Outlier Detection for Software Development Effort Estimation",
-  "2505.19134": "Incentivizing High-Quality Human Annotations with Golden Questions",
-  "electronics-10-02717": "Stock Market Prediction Using Machine Learning Techniques: A Decade Survey on Methodologies, Recent Developments, and Future Directions",
-  "2407.04051": "FunAudioLLM: Voice Understanding and Generation Foundation Models for Natural Interaction Between Humans and LLMs",
-  "2410.08035": "IntrinsicVoice: Empowering LLMs with Intrinsic Real-Time Voice Interaction Abilities",
-  "2501.18096": "MILS: LLMs can see and hear without any training",
-  "pannuke-handcrafted-features": "Evaluation of hand-crafted features with mask images obtained from PanNuke dataset using Bayesian optimization and machine learning models",
-  "cancer-ensemble-segmentation": "Class Probability-guided Ensemble Learning-based Semantic Segmentation to Predict Cancerous Regions on Hematoxylin and Eosin-stained Images"
+  "2005.11401": {
+    "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+    "authors": [
+      "Patrick Lewis",
+      "Ethan Perez",
+      "Aleksandra Piktus",
+      "Fabio Petroni",
+      "Vladimir Karpukhin",
+      "Naman Goyal",
+      "Heinrich Küttler",
+      "Mike Lewis",
+      "Wen-tau Yih",
+      "Tim Rocktäschel",
+      "Sebastian Riedel",
+      "Douwe Kiela"
+    ],
+    "pages": 19,
+    "sha256": "23e3249e9a1e75418d82efecab0ea8c4d033b89c93742f63208d47ce01f21233",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2005.11401"
+  },
+  "2002.08909": {
+    "title": "REALM: Retrieval-Augmented Language Model Pre-Training",
+    "authors": [
+      "Kelvin Guu",
+      "Kenton Lee",
+      "Zora Tung",
+      "Panupong Pasupat",
+      "Ming-Wei Chang"
+    ],
+    "pages": 12,
+    "sha256": "0ec1a7ab3de5514c6d3baa8af0322816d4ee7cd4c14b9f2c450cbc9da9e6b363",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2002.08909"
+  },
+  "2007.01282": {
+    "title": "Leveraging Passage Retrieval with Generative Models for Open Domain Question Answering",
+    "authors": [
+      "Gautier Izacard",
+      "Edouard Grave"
+    ],
+    "pages": 6,
+    "sha256": "f1ee7e927c3fb31beb2146f8c205692a91b40dadd65d80e025c6686e4d430953",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2007.01282"
+  },
+  "2004.04906": {
+    "title": "Dense Passage Retrieval for Open-Domain Question Answering",
+    "authors": [
+      "Vladimir Karpukhin",
+      "Barlas Oğuz",
+      "Sewon Min",
+      "Patrick Lewis",
+      "Ledell Wu",
+      "Sergey Edunov",
+      "Danqi Chen",
+      "Wen-tau Yih"
+    ],
+    "pages": 13,
+    "sha256": "3e67fc1a9977715acf722d85f0b7d124b03715e975f6310a4d6c12094190912f",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2004.04906"
+  },
+  "2112.04426": {
+    "title": "Improving Language Models by Retrieving from Trillions of Tokens",
+    "authors": [
+      "Sebastian Borgeaud",
+      "Arthur Mensch",
+      "Jordan Hoffmann",
+      "Trevor Cai",
+      "et al."
+    ],
+    "pages": 43,
+    "sha256": "1b3e89b589b73d51ca76cb7d98f22fa5438f8b13e05363613bc6b3199f9777f4",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2112.04426"
+  },
+  "2309.15217": {
+    "title": "RAGAs: Automated Evaluation of Retrieval Augmented Generation",
+    "authors": [
+      "Shahul Es",
+      "Jithin James",
+      "Luis Espinosa-Anke",
+      "Steven Schockaert"
+    ],
+    "pages": 8,
+    "sha256": "6c24762a3f277fd120ed1adf34b01420ecf92f18ff6d1b5435fa0a09cb804ecb",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2309.15217"
+  },
+  "2307.03172": {
+    "title": "Lost in the Middle: How Language Models Use Long Contexts",
+    "authors": [
+      "Nelson F. Liu",
+      "Kevin Lin",
+      "John Hewitt",
+      "Ashwin Paranjape",
+      "Michele Bevilacqua",
+      "Fabio Petroni",
+      "Percy Liang"
+    ],
+    "pages": 18,
+    "sha256": "653b29619eae2ae4b361d7bdcdc06db4bedcb1b0eabe31814036beca8c1af0b1",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2307.03172"
+  },
+  "2310.11511": {
+    "title": "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection",
+    "authors": [
+      "Akari Asai",
+      "Zeqiu Wu",
+      "Yizhong Wang",
+      "Avirup Sil",
+      "Hannaneh Hajishirzi"
+    ],
+    "pages": 30,
+    "sha256": "d9eaa1398abac0df67a9d0933a5bf8b6d9d83d2e72da2a486073cd842dd52978",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2310.11511"
+  },
+  "2401.15884": {
+    "title": "Corrective Retrieval Augmented Generation",
+    "authors": [
+      "Shi-Qi Yan",
+      "Jia-Chen Gu",
+      "Yun Zhu",
+      "Zhen-Hua Ling"
+    ],
+    "pages": 16,
+    "sha256": "975aa1fd3c1b603126e93ff99d6504858b61301bf1d34c9df88ebe53a0b026cb",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2401.15884"
+  },
+  "2306.05685": {
+    "title": "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena",
+    "authors": [
+      "Lianmin Zheng",
+      "Wei-Lin Chiang",
+      "Ying Sheng",
+      "Siyuan Zhuang",
+      "Zhanghao Wu",
+      "Yonghao Zhuang",
+      "Zi Lin",
+      "Zhuohan Li",
+      "Dacheng Li",
+      "Eric P. Xing",
+      "Hao Zhang",
+      "Joseph E. Gonzalez",
+      "Ion Stoica"
+    ],
+    "pages": 29,
+    "sha256": "1574982845157569b85c1214bfa9987000384d7a5e3b5fbdcc5a29afec59cb81",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2306.05685"
+  },
+  "2303.16634": {
+    "title": "G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment",
+    "authors": [
+      "Yang Liu",
+      "Dan Iter",
+      "Yichong Xu",
+      "Shuohang Wang",
+      "Ruochen Xu",
+      "Chenguang Zhu"
+    ],
+    "pages": 11,
+    "sha256": "3a822b8646dccda73b01eda9b07420072daf7601cb0d02d9bbc3b38325ab2fd2",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2303.16634"
+  },
+  "2401.18059": {
+    "title": "RAPTOR: Recursive Abstractive Processing for Tree-Organized Retrieval",
+    "authors": [
+      "Parth Sarthi",
+      "Salman Abdullah",
+      "Aditi Tuli",
+      "Shubh Khanna",
+      "Anna Goldie",
+      "Christopher D. Manning"
+    ],
+    "pages": 23,
+    "sha256": "01319e2e6e6ecfd504ee1bbda41d023f9e060bd3505ab3c161baa1d6d696cf75",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2401.18059"
+  },
+  "gsad-sdee-2022": {
+    "title": "Adaptive Discretization Using Golden Section to Aid Outlier Detection for Software Development Effort Estimation",
+    "authors": [
+      "Swarnima Singh Gautam",
+      "Vrijendra Singh"
+    ],
+    "pages": 19,
+    "sha256": "b0a5e21d2446b793da8402741ab13a21b759f40e6e83ac467495f9427231ec81",
+    "status": "verified-2026-10-20",
+    "source": "upload: IEEE Access 2022, doi:10.1109/ACCESS.2022.3200149"
+  },
+  "2505.19134": {
+    "title": "Incentivizing High-Quality Human Annotations with Golden Questions",
+    "authors": [
+      "Shang Liu",
+      "Zhongze Cai",
+      "Hanzhao Wang",
+      "Zhongyao Ma",
+      "Xiaocheng Li"
+    ],
+    "pages": 36,
+    "sha256": "73b1247a6967afb7af1ed4fd679dc6757defe659d7c9add77b530b8cd2c4a3e0",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2505.19134"
+  },
+  "electronics-10-02717": {
+    "title": "Stock Market Prediction Using Machine Learning Techniques: A Decade Survey on Methodologies, Recent Developments, and Future Directions",
+    "authors": [
+      "Nusrat Rouf",
+      "Majid Bashir Malik",
+      "Tasleem Arif",
+      "Sparsh Sharma",
+      "Saurabh Singh",
+      "Satyabrata Aich",
+      "Hee-Cheol Kim"
+    ],
+    "pages": 25,
+    "sha256": "e2ac0b2456e65d8bd6a14d6e86614796ef5e22e6cbf93660151aec8bf754e0a7",
+    "status": "verified-2026-10-20",
+    "source": "upload: Electronics 2021, 10(21):2717"
+  },
+  "2407.04051": {
+    "title": "FunAudioLLM: Voice Understanding and Generation Foundation Models for Natural Interaction Between Humans and LLMs",
+    "authors": [
+      "Tongyi SpeechTeam, Alibaba Group"
+    ],
+    "pages": 21,
+    "sha256": "ad6e8caf510332c50848a7c5681082ac64b9721a4a682acfc1becea71b275a25",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2407.04051"
+  },
+  "2410.08035": {
+    "title": "IntrinsicVoice: Empowering LLMs with Intrinsic Real-Time Voice Interaction Abilities",
+    "authors": [
+      "Xin Zhang",
+      "Xiang Lyu",
+      "Zhihao Du",
+      "Qian Chen",
+      "Dong Zhang",
+      "Hangrui Hu",
+      "Chaohong Tan",
+      "Tianyu Zhao",
+      "Yuxuan Wang",
+      "Bin Zhang",
+      "Heng Lu",
+      "Yaqian Zhou",
+      "Xipeng Qiu"
+    ],
+    "pages": 13,
+    "sha256": "9b51653482fd28478e4a18999ecd5b923f5257df357160d271c409e09d892979",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2410.08035"
+  },
+  "2501.18096": {
+    "title": "LLMs can see and hear without any training",
+    "authors": [
+      "Kumar Ashutosh",
+      "Yossi Gandelsman",
+      "Xinlei Chen",
+      "Ishan Misra",
+      "Rohit Girdhar"
+    ],
+    "pages": 15,
+    "sha256": "4b5b144797244d66ef863f316e222c44ab3e26d6f91492ab6fdc9ea7218a2b22",
+    "status": "verified-2026-10-20",
+    "source": "https://arxiv.org/abs/2501.18096"
+  },
+  "pannuke-handcrafted-features": {
+    "title": "Evaluation of hand-crafted features with mask images obtained from PanNuke dataset using Bayesian optimization and machine learning models",
+    "authors": [
+      "Siri Yellu",
+      "Sai Chandana Koganti",
+      "Hamed Elghazzali",
+      "Yanjun Zhao",
+      "Drew F. Williamson",
+      "Sanghoon Lee"
+    ],
+    "pages": 10,
+    "sha256": "4052e81474bcb9f92f6f9604f3276fd6293218aaae093116a51852088f672250",
+    "status": "verified-2026-10-20",
+    "source": "upload"
+  },
+  "cancer-ensemble-segmentation": {
+    "title": "Class Probability-guided Ensemble Learning-based Semantic Segmentation to Predict Cancerous Regions on Hematoxylin and Eosin-stained Images",
+    "authors": [
+      "Sanghoon Lee",
+      "Sai Chandana Koganti",
+      "InChan Hwang",
+      "MinJae Woo"
+    ],
+    "pages": 8,
+    "sha256": "5045daa2eed2010cc1610b9cf492763b36bad97dec188d38326ecd540aaca2e8",
+    "status": "verified-2026-10-20",
+    "source": "upload"
+  }
 }

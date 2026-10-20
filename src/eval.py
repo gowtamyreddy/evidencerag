@@ -17,6 +17,7 @@ them the correct behavior is insufficient_evidence, not retrieval.
 
 import json
 import sys
+import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -74,11 +75,13 @@ def evaluate(retriever, golden, top_k=EVAL_TOP_K, reranker=None):
     ]
     results = []
     for entry in answerable:
+        started = time.perf_counter()
         if reranker is not None:
             fused = retriever.hybrid_search(entry["question"], top_k=RERANK_CANDIDATES)
             ranked = rerank_module.rerank(entry["question"], fused, reranker, top_k)
         else:
             ranked = retriever.hybrid_search(entry["question"], top_k=top_k)
+        retrieval_ms = int((time.perf_counter() - started) * 1000)
         rank = rank_of_expected(ranked, entry["expected_doc_ids"])
         hits = sum(1 for chunk, _ in ranked if chunk["doc_id"] in entry["expected_doc_ids"])
         results.append(
@@ -87,6 +90,7 @@ def evaluate(retriever, golden, top_k=EVAL_TOP_K, reranker=None):
                 "type": entry.get("type", "factual"),
                 "rank": rank,
                 "precision": hits / top_k,
+                "retrieval_ms": retrieval_ms,
             }
         )
     return results
@@ -99,6 +103,10 @@ def summarize(results):
         summary[f"hit@{k}"] = sum(1 for r in results if r["rank"] is not None and r["rank"] <= k) / total
     summary["mrr"] = sum(1.0 / r["rank"] for r in results if r["rank"] is not None) / total
     summary["citation_precision"] = sum(r["precision"] for r in results) / total
+    latencies = sorted(r["retrieval_ms"] for r in results if "retrieval_ms" in r)
+    if latencies:
+        summary["mean_retrieval_ms"] = int(sum(latencies) / len(latencies))
+        summary["p50_retrieval_ms"] = latencies[len(latencies) // 2]
     return summary
 
 
@@ -112,8 +120,14 @@ def print_table(summary):
 
 def main():
     artifacts_dir = PROJECT_ROOT / "data" / "artifacts"
-    args = [a for a in sys.argv[1:] if a != "--rerank"]
-    use_rerank = "--rerank" in sys.argv
+    raw_args = sys.argv[1:]
+    use_rerank = "--rerank" in raw_args
+    json_path = None
+    if "--json" in raw_args:
+        json_idx = raw_args.index("--json")
+        json_path = Path(raw_args[json_idx + 1])
+        del raw_args[json_idx:json_idx + 2]
+    args = [a for a in raw_args if a != "--rerank"]
     golden_path = Path(args[0]) if args else PROJECT_ROOT / "data" / "golden_sample.jsonl"
     print("Loading retriever...")
     retriever = load_retriever(artifacts_dir)
@@ -125,11 +139,40 @@ def main():
     mode = "hybrid + cross-encoder rerank" if use_rerank else "hybrid (dense + BM25 + RRF)"
     print(f"Evaluating {len(golden)} golden questions (mode: {mode})...\n")
     results = evaluate(retriever, golden, reranker=reranker)
+    corpus_doc_ids = {chunk["doc_id"] for chunk in retriever.chunks}
+    missing = [
+        entry for entry in golden
+        if entry.get("expected_doc_ids")
+        and not corpus_doc_ids.intersection(entry["expected_doc_ids"])
+    ]
+    if missing:
+        print(f"WARNING: {len(missing)} golden question(s) expect documents that are "
+              f"not in this corpus; they will score as misses:\n")
+        for entry in missing:
+            print(f"  [missing doc] {entry['expected_doc_ids']} {entry['question'][:60]}")
+        print()
     for entry in results:
         rank = entry["rank"] if entry["rank"] is not None else "miss"
         print(f"[{entry['type']:<10}] rank={rank:<4} {entry['question'][:70]}")
     print()
-    print_table(summarize(results))
+    summary = summarize(results)
+    print_table(summary)
+    if "mean_retrieval_ms" in summary:
+        print(f"\nretrieval latency: mean {summary['mean_retrieval_ms']} ms, "
+              f"p50 {summary['p50_retrieval_ms']} ms (this machine, models already loaded)")
+    if json_path is not None:
+        payload = {
+            "golden_file": str(golden_path),
+            "mode": mode,
+            "corpus": {
+                "chunks": len(retriever.chunks),
+                "documents": len({chunk["doc_id"] for chunk in retriever.chunks}),
+            },
+            "summary": summary,
+            "results": results,
+        }
+        json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        print(f"\nWrote machine-readable results to {json_path}")
     graceful = [e for e in golden if e.get("type") in ("unanswerable", "ambiguous")]
     if graceful:
         print("\nGraceful-failure questions (excluded from metrics above):")

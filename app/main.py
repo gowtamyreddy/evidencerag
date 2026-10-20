@@ -31,13 +31,15 @@ first with: python scripts/build_index.py
 """
 
 import io
+import ipaddress
 import re
+import socket
 import threading
 import time
 import zipfile
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import requests
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
@@ -55,6 +57,11 @@ UI_FILE = Path(__file__).resolve().parent / "ui.html"
 
 MAX_ZIP_BYTES = 100 * 1024 * 1024  # 100 MB
 MAX_PDFS = 50
+MAX_PDF_BYTES_EACH = 50 * 1024 * 1024  # one extracted PDF
+MAX_EXTRACTED_TOTAL = 150 * 1024 * 1024  # whole zip, extracted (zip-bomb guard)
+MAX_FETCH_BYTES = 25 * 1024 * 1024  # one /fetch download, enforced while streaming
+MAX_FETCH_REDIRECTS = 5
+FETCH_TIMEOUT = (5, 30)  # (connect, read) seconds
 
 app = FastAPI(title="EvidenceRAG", version="0.2.0")
 
@@ -136,37 +143,61 @@ def _unique_stem(uploads_dir, stem):
     return candidate
 
 
-def _extract_pdfs(zip_bytes):
-    """Extract PDF members of an uploaded zip to data/uploads/.
+def _looks_like_pdf(data):
+    """Content check, not extension trust: real PDFs start with %PDF-."""
+    return data[:5] == b"%PDF-"
 
-    Member names are flattened to their basename, so a zip can never write
-    outside the uploads directory. Returns the list of extracted paths.
+
+def _extract_pdfs(zip_bytes):
+    """Extract valid PDF members of an uploaded zip to data/uploads/.
+
+    Defenses, in order: member names are flattened to their basename, so a
+    zip can never write outside the uploads directory (Zip Slip); each
+    member's declared size and actual content are capped (zip bombs);
+    members must actually be PDFs (magic bytes, not the .pdf extension).
+    The previous dynamic corpus is only replaced once at least one valid
+    PDF has been extracted, so a bad upload cannot wipe a working corpus.
+    Returns the list of extracted paths.
     """
-    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    extracted = []
-    seen_stems = set()
     try:
-        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
-            members = archive.namelist()
+        archive = zipfile.ZipFile(io.BytesIO(zip_bytes))
     except zipfile.BadZipFile:
         raise
-    # The zip is valid: safe to replace the previous dynamic corpus.
-    for old in list(UPLOADS_DIR.glob("*.pdf")) + list(UPLOADS_DIR.glob("*.txt")):
-        old.unlink()
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
-        for member in members:
-            name = Path(member).name
+    valid = []  # (filename, bytes), fully validated before anything is written
+    total = 0
+    seen_stems = set()
+    with archive:
+        for info in archive.infolist():
+            if info.is_dir():
+                continue
+            name = Path(info.filename).name
             if not name.lower().endswith(".pdf"):
                 continue
             stem = Path(name).stem
             if stem in seen_stems:
                 continue
-            seen_stems.add(stem)
-            target = UPLOADS_DIR / name
-            target.write_bytes(archive.read(member))
-            extracted.append(target)
-            if len(extracted) >= MAX_PDFS:
+            if info.file_size > MAX_PDF_BYTES_EACH:
+                continue
+            data = archive.read(info.filename)
+            if len(data) > MAX_PDF_BYTES_EACH or not _looks_like_pdf(data):
+                continue
+            total += len(data)
+            if total > MAX_EXTRACTED_TOTAL:
                 break
+            seen_stems.add(stem)
+            valid.append((name, data))
+            if len(valid) >= MAX_PDFS:
+                break
+    if not valid:
+        return []
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    for old in list(UPLOADS_DIR.glob("*.pdf")) + list(UPLOADS_DIR.glob("*.txt")):
+        old.unlink()
+    extracted = []
+    for name, data in valid:
+        target = UPLOADS_DIR / name
+        target.write_bytes(data)
+        extracted.append(target)
     return extracted
 
 
@@ -300,6 +331,76 @@ def _doc_id_from_url(url):
     return slug or "web-doc"
 
 
+def _assert_public_host(hostname):
+    """SSRF boundary: require EVERY address a host resolves to be public.
+
+    Without this, /fetch can be pointed at loopback services or the cloud
+    metadata endpoint (169.254.169.254) — directly, via a redirect from a
+    public URL, or via an encoded IP form (decimal/octal), all of which
+    getaddrinfo resolves to the real address. Fetched content lands in the
+    corpus, where /query would read it back: a full exfiltration channel.
+    Known residual risk: DNS rebinding between this check and the actual
+    connect (requests re-resolves). Fully closing that window requires
+    connecting to the pinned IP with manual SNI handling; the check still
+    blocks the realistic attacks. Raises ValueError (user-safe message).
+    """
+    try:
+        infos = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+    except socket.gaierror:
+        raise ValueError("That host could not be resolved.")
+    addresses = {info[4][0] for info in infos}
+    if not addresses:
+        raise ValueError("That host could not be resolved.")
+    for address in addresses:
+        if not ipaddress.ip_address(address).is_global:
+            raise ValueError(
+                "Fetching private, loopback, link-local, or reserved addresses is not allowed."
+            )
+
+
+def _fetch_url_safely(url):
+    """GET a URL with SSRF defenses. Returns (content_bytes, content_type).
+
+    Redirects are followed manually (max MAX_FETCH_REDIRECTS) so every hop
+    is re-validated; the body is streamed and aborted past MAX_FETCH_BYTES
+    so a hostile server cannot exhaust memory by streaming forever.
+    """
+    current = url
+    for _hop in range(MAX_FETCH_REDIRECTS + 1):
+        parts = urlsplit(current)
+        if parts.scheme not in ("http", "https"):
+            raise ValueError("URL must start with http:// or https://.")
+        if not parts.hostname:
+            raise ValueError("URL has no host.")
+        _assert_public_host(parts.hostname)
+        response = requests.get(
+            current,
+            headers={"User-Agent": "EvidenceRAG demo (corpus fetch)"},
+            timeout=FETCH_TIMEOUT,
+            stream=True,
+            allow_redirects=False,
+        )
+        try:
+            if response.status_code in (301, 302, 303, 307, 308):
+                location = response.headers.get("Location")
+                if not location:
+                    raise ValueError("That URL redirects without a destination.")
+                current = urljoin(current, location)
+                continue
+            response.raise_for_status()
+            body = bytearray()
+            for piece in response.iter_content(chunk_size=65536):
+                body.extend(piece)
+                if len(body) > MAX_FETCH_BYTES:
+                    raise ValueError(
+                        f"Fetched file is larger than {MAX_FETCH_BYTES // (1024 * 1024)} MB."
+                    )
+            return bytes(body), response.headers.get("Content-Type", "").lower()
+        finally:
+            response.close()
+    raise ValueError("Too many redirects.")
+
+
 @app.post("/fetch", status_code=202)
 async def fetch_url(request: FetchRequest, background_tasks: BackgroundTasks):
     """Fetch a URL (PDF or web page) and add it to the dynamic corpus.
@@ -308,29 +409,32 @@ async def fetch_url(request: FetchRequest, background_tasks: BackgroundTasks):
     rebuilt in the background; poll GET /upload/status for progress. Repeats
     of the same URL get a numeric suffix instead of overwriting.
     """
-    if not request.url.startswith(("http://", "https://")):
-        raise HTTPException(status_code=400, detail="URL must start with http:// or https://.")
+    # State first: never download or write files while a build is running
+    # (the builder reads this same directory; mutating it mid-build mixes
+    # two corpus versions).
+    with _state_lock:
+        if _state["building"]:
+            raise HTTPException(status_code=409, detail="An index build is already running.")
     try:
-        response = requests.get(
-            request.url,
-            headers={"User-Agent": "EvidenceRAG demo (corpus fetch)"},
-            timeout=30,
-        )
-        response.raise_for_status()
+        content, content_type = _fetch_url_safely(request.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except requests.RequestException as exc:
         raise HTTPException(status_code=400, detail=f"Could not fetch that URL: {exc}")
-    if len(response.content) > MAX_ZIP_BYTES:
-        raise HTTPException(status_code=413, detail="Fetched file is larger than 100 MB.")
-    content_type = response.headers.get("Content-Type", "").lower()
 
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     if "application/pdf" in content_type or request.url.lower().endswith(".pdf"):
+        if not _looks_like_pdf(content):
+            raise HTTPException(
+                status_code=400,
+                detail="That URL claims to be a PDF but its content is not one.",
+            )
         stem = _unique_stem(UPLOADS_DIR, _doc_id_from_url(request.url))
         target = UPLOADS_DIR / f"{stem}.pdf"
-        target.write_bytes(response.content)
+        target.write_bytes(content)
     elif "text/html" in content_type or "text/plain" in content_type or not content_type:
         extractor = _TextExtractor()
-        extractor.feed(response.text)
+        extractor.feed(content.decode("utf-8", errors="replace"))
         text = extractor.text()
         if len(text) < 200:
             raise HTTPException(status_code=400, detail="That page has too little readable text to index.")

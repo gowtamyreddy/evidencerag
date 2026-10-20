@@ -1,50 +1,63 @@
-# Corpus content notes (audited 2026-10-19)
+# Corpus content notes (audited 2026-10-19; corrected 2026-10-20)
 
-`manifest.json` titles do NOT always match the actual PDF content.
-Golden questions must ground `expected_doc_id` in the ACTUAL content, not the manifest title.
+## Resolution (2026-10-20)
 
-## Mislabeled files (do not use until fixed)
+Root cause found: the arXiv ID list in `scripts/fetch_corpus.py` itself
+carried five wrong IDs, so the script faithfully downloaded the wrong
+papers. The fetch list is corrected, the wrong files are removed, and the
+intended papers are in place, each verified against its own first page
+(title + authors) and recorded with a SHA-256 in `manifest.json` (v2
+format). `scripts/validate_corpus.py` re-checks files, hashes, and titles
+offline; it currently passes 20/20.
 
-| File | Manifest says | Actually contains |
-|---|---|---|
-| 2002.08904.pdf | REALM | Twisted double bilayer graphene physics (Minhao He et al.) |
-| 2002.08525.pdf | Fusion-in-Decoder | Physically-consistent NN convection models, climate (Beucler et al.) |
-| 2104.08691.pdf | RETRO | Parameter-efficient prompt tuning (Lester et al.) |
-| 2312.10997.pdf | RAPTOR | "Retrieval-Augmented Generation for Large Language Models: A Survey" (Gao et al.) |
-| 2401.18059.pdf | Corrective RAG (CRAG) | RAPTOR (Sarthi et al.) — actual RAPTOR paper lives here |
+| File (removed) | Claimed | Actually contained | Replacement |
+|---|---|---|---|
+| 2002.08904.pdf | REALM | Twisted double bilayer graphene physics (He et al.) | 2002.08909 = REALM (Guu et al.) |
+| 2002.08525.pdf | Fusion-in-Decoder | NN convection models for climate (Beucler et al.) | 2007.01282 = FiD (Izacard & Grave) |
+| 2104.08691.pdf | RETRO | Parameter-efficient prompt tuning (Lester et al.) | 2112.04426 = RETRO (Borgeaud et al.) |
+| 2312.10997.pdf | RAPTOR | RAG survey (Gao et al.) | — (survey was never an intended corpus paper) |
+| 2401.18059.pdf | Corrective RAG | RAPTOR (Sarthi et al.) — the file was RAPTOR all along | kept; CRAG added as 2401.15884 (Yan et al.) |
 
-Notes:
-- There is NO Corrective RAG paper in the corpus; nothing covers Correct/Incorrect/Ambiguous retrieval actions.
-- 2312.10997 (RAG survey) IS RAG-relevant but its ID is misleading; its invented taxonomy is "Naive RAG / Advanced RAG / Modular RAG".
-- 2401.18059 is a truthful ID for RAPTOR (that is RAPTOR's real arXiv ID).
+Consequences for the evaluation: golden questions never referenced the
+removed files as expected documents, and the one question expecting
+2401.18059 now has a true label (the file really is RAPTOR). On the
+corrected corpus, stage-1 metrics moved slightly (hit@1 0.812, MRR 0.887,
+citation precision 0.863) and the misses changed character: the Self-RAG
+question's rank-1 slot is now held by CRAG (2401.15884), a genuinely
+related paper, instead of the mislabeled survey. The cross-encoder
+reranker still resolves every miss (hit@1 1.000, citation precision
+0.988). Metrics were re-measured on the corrected corpus; see the
+README's evaluation table.
 
-## Verified-clean files used in golden_questions_v1.jsonl
+## Historical audit (2026-10-19, superseded by the fix above)
 
-2005.11401 (RAG), 2004.04906 (DPR), 2309.15217 (RAGAs), 2307.03172 (Lost in the Middle),
-2310.11511 (Self-RAG), 2306.05685 (LLM-as-a-Judge), 2303.16634 (G-Eval), 2407.04051 (FunAudioLLM),
-2410.08035 (IntrinsicVoice), 2501.18096 (MILS), 2505.19134 (golden questions),
-gsad-sdee-2022, electronics-10-02717, pannuke-handcrafted-features, cancer-ensemble-segmentation.
+`manifest.json` titles did NOT match the actual PDF content for five
+files. Golden questions were grounded only in the verified files:
+2005.11401 (RAG), 2004.04906 (DPR), 2309.15217 (RAGAs), 2307.03172 (Lost
+in the Middle), 2310.11511 (Self-RAG), 2306.05685 (LLM-as-a-Judge),
+2303.16634 (G-Eval), 2407.04051 (FunAudioLLM), 2410.08035 (IntrinsicVoice),
+2501.18096 (MILS), 2505.19134 (golden questions), gsad-sdee-2022,
+electronics-10-02717, pannuke-handcrafted-features,
+cancer-ensemble-segmentation.
 
-## Uploaded 2026-10-19 (not yet in corpus — pending her call on ingestion)
+## Not in the corpus (uploaded 2026-10-19, parked by decision)
 
-| Proposed ID | File | Content |
-|---|---|---|
-| 2609.38419 | 2609.38419v1.pdf | Colorectal Cancer Segmentation with Adaptive Augmentation and Multi-Resolution Ensemble Models (Caglar & Temizel) |
-| llm-lossless-image-compression | NeurIPS-2025-...-Paper-Conference.pdf | Large Language Models for Lossless Image Compression: Next-Pixel Prediction in Language Space is All You Need (P2-LLM) |
-| sn-fpn-pathology-segmentation | SN-FPN_...pdf | SN-FPN: Self-Attention Nested Feature Pyramid Network for Digital Pathology Image Segmentation (KSU: Sanghoon Lee, Sai Chandana Koganti — same group as the other two KSU papers; uses BCSS like cancer-ensemble-segmentation) |
+- 2609.38419 — Colorectal Cancer Segmentation (Caglar & Temizel)
+- NeurIPS-2025 LLM lossless image compression paper (P2-LLM)
+- SN-FPN pathology segmentation paper (Lee, Koganti et al.)
 
-Golden questions for these three live in `data/golden_questions_new_papers.jsonl` (kept separate until ingested).
-Note: all other 2026-10-19 uploads were byte- or text-identical to corpus files — no version conflicts.
+Their golden questions live in `data/golden_questions_new_papers.jsonl`,
+kept separate until a decision is made to ingest them.
 
 ## Keyword uniqueness traps (checked corpus-wide 2026-10-19)
 
-- "reflection tokens" appears in 2310.11511 AND the survey 2312.10997; use "critique tokens" (Self-RAG only).
-- "CosyVoice" appears in 2407.04051 and 2410.08035; "SenseVoice" is FunAudioLLM-only.
-- "0.618" appears in gsad-sdee-2022 and pannuke-handcrafted-features; "golden section" is GSAD-only.
-- DPR and RAG both use 21M 100-word Wikipedia chunks but different dumps (DPR: Dec 2018, 21,015,324 passages; RAG: Dec 2016, 21M docs) — pair numbers with dump date.
-- RAG-Sequence/RAG-Token = 2005.11401 only; Naive/Advanced/Modular RAG = survey 2312.10997 only.
-- "DeepLabv3" is now shared by THREE papers (cancer-ensemble-segmentation, 2609.38419, SN-FPN) — never use it alone as a keyword; pair with PgEns / SN-FPN / adaptive augmentation.
-- "diffusion" appears in 2407.04051 and 2501.18096 but neither discusses learning-rate schedules — the v1 diffusion unanswerable still holds.
-- "class probability-guided" appears in BOTH KSU papers (pannuke overlaps cancer) — use "PgEns" (cancer-only) instead.
-- "CosyVoice" appears in 2407.04051 and 2410.08035; "SenseVoice" is FunAudioLLM-only.
-- P2-LLM renders as "P2 -LLM" in extracted text — keyword used is "next-pixel prediction" instead.
+- "reflection tokens" appears in 2310.11511 AND (formerly) the survey
+  2312.10997; the survey is removed, but "critique tokens" remains the
+  safer Self-RAG keyword.
+- "CosyVoice" appears in 2407.04051 and 2410.08035; "SenseVoice" is
+  FunAudioLLM-only.
+- "0.618" appears in gsad-sdee-2022 and pannuke-handcrafted-features;
+  "golden section" is GSAD-only.
+- DPR and RAG both use 21M 100-word Wikipedia chunks but different dumps
+  (DPR: Dec 2018, 21,015,324 passages; RAG: Dec 2016, 21M docs) — pair
+  numbers with dump date.
