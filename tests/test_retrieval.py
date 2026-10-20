@@ -157,3 +157,15 @@ def test_rerank_reorders_by_cross_encoder_score():
     ranked = rerank_module.rerank("q", fused, _StubReranker("goldenneedle"), top_k=2)
     assert ranked[0][0]["doc_id"] == "specific"
     assert ranked[0][1] == 1.0
+
+
+def test_clean_text_strips_lone_surrogates():
+    """Regression test for the 130-paper build crash: arXiv 2606.22352
+    (a vision-tokens paper) extracts with unpaired UTF-16 surrogates for
+    its math glyphs. They are legal Python str content but cannot be
+    UTF-8 encoded, so the embedding tokenizer died with a misleading
+    TypeError. clean_text must remove them."""
+    dirty = "Vision Tokens \ud835\ud835 D and \ud800 more text"
+    cleaned = ingest.clean_text(dirty)
+    cleaned.encode("utf-8")  # raises if a lone surrogate survived
+    assert "Vision" in cleaned and "more" in cleaned

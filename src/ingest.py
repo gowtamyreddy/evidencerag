@@ -19,8 +19,19 @@ DEFAULT_OVERLAP = 100
 
 
 def clean_text(text):
-    """Collapse all whitespace to single spaces and strip the result."""
+    """Collapse all whitespace to single spaces and strip the result.
+
+    Also replaces lone UTF-16 surrogates with spaces. Some PDFs encode
+    math glyphs (e.g. mathematical bold letters, U+1D400 block) as
+    surrogate pairs, and pypdf can return the halves unpaired. A lone
+    surrogate is legal in a Python string but cannot be encoded to
+    UTF-8, so it crashes the embedding tokenizer downstream with a
+    misleading type error (found the hard way at 130 papers: arXiv
+    2606.22352). The original glyph is unrecoverable at that point,
+    so a space is the honest replacement.
+    """
     text = text.replace("\x00", " ")
+    text = re.sub(r"[\ud800-\udfff]", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 

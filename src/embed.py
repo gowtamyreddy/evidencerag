@@ -19,6 +19,15 @@ def _normalize(vectors):
     return vectors / norms
 
 
+def _sanitize(text):
+    """Make a string safe for the tokenizer: lone UTF-16 surrogates
+    (which some PDF extractors emit) cannot be UTF-8 encoded and crash
+    the fast tokenizer. Ingested text is cleaned in ingest.clean_text;
+    this is the same guard at the embedding boundary for text that
+    arrives by other paths (queries, transcripts, fetched pages)."""
+    return text.encode("utf-8", "replace").decode("utf-8")
+
+
 class Embedder:
     """Loads the model once, embeds passages and queries on demand."""
 
@@ -27,12 +36,13 @@ class Embedder:
 
     def embed_passages(self, texts):
         """Embed a list of passages. Returns a normalized (n, dim) array."""
+        texts = [_sanitize(text) for text in texts]
         vectors = self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
         return _normalize(np.asarray(vectors, dtype=np.float32))
 
     def embed_query(self, text):
         """Embed one query. Returns a normalized (dim,) vector."""
-        vectors = self.model.encode([text], convert_to_numpy=True, show_progress_bar=False)
+        vectors = self.model.encode([_sanitize(text)], convert_to_numpy=True, show_progress_bar=False)
         return _normalize(np.asarray(vectors, dtype=np.float32))[0]
 
     def save_embeddings(self, vectors, path):
